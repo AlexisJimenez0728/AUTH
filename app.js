@@ -1,9 +1,19 @@
 const express = require('express');
 const app = express();
 app.use(express.json());
-const { models: { User }} = require('./db');
+const { models: { User, Note }} = require('./db');
 const path = require('path');
-const jtw = require('jsonwebtoken')
+const jwt = require('jsonwebtoken')
+
+async function requireToken(req, res, next) {
+  try{
+  let user = await User.byToken(req.headers.authorization);
+  req.user = user;
+  next()
+  } catch(error) {
+    next(error);
+  }
+}
 
 app.get('/', (req, res)=> res.sendFile(path.join(__dirname, 'index.html')));
 
@@ -16,9 +26,22 @@ app.post('/api/auth', async(req, res, next)=> {
   }
 });
 
-app.get('/api/auth', async(req, res, next)=> {
+app.get('/api/auth', requireToken, async(req, res, next)=> {
   try {
-    res.send(await User.byToken(req.headers.authorization));
+    res.send(req.user);
+  }
+  catch(ex){
+    next(ex);
+  }
+});
+app.get('/api/users/:id/notes', requireToken, async(req, res, next)=> {
+  try {
+    if(req.params.id == req.user.dataValues.id){
+    const notes = await Note.findAll({where: {userId: req.params.id}})
+    res.send(notes);
+    } else {
+      res.sendStatus(404);
+    }
   }
   catch(ex){
     next(ex);
